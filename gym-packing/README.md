@@ -5,7 +5,13 @@ python -m venv env
 env\Scripts\activate
 
 pip install -e .
-python main.py
+
+# run random agent
+python play_random.py
+
+# train and run a model
+python train_model.py
+python play_model.py
 ```
 
 ## Concept
