@@ -15,7 +15,7 @@ class Packing2DWorldEnv(gym.Env):
     """
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=(5, 5), use_height_map=True):
+    def __init__(self, render_mode=None, size=(40, 20), use_height_map=True):
         """
         Initialize the packing environment.
 
@@ -32,11 +32,18 @@ class Packing2DWorldEnv(gym.Env):
             order_id="test",
             articles=[
                 Article(
-                    article_id="article 1",
+                    article_id="article large",
+                    width=4,
+                    length=1,
+                    height=4,
+                    amount=10
+                ),
+                Article(
+                    article_id="article small",
                     width=2,
                     length=1,
                     height=2,
-                    amount=4
+                    amount=30
                 )
             ])
 
@@ -53,11 +60,12 @@ class Packing2DWorldEnv(gym.Env):
                 ))
 
         # Define the observation space
-        grid_size = (self.size[1],) if self.use_height_map else self.size
-        grid_max = self.size[0] + 1 if self.use_height_map else 1
+        grid_size = (self.size[0],) if self.use_height_map else self.size
+        grid_max = self.size[1] + 1 if self.use_height_map else 1
+        print(grid_size)
         self.observation_space = spaces.Dict({
             # dimension and position of the item in 2D space
-            "item": spaces.Box(low=0, high=max(size) - 1, shape=(4,), dtype=int),
+            "item": spaces.Box(low=0, high=max(size), shape=(4,), dtype=int),
             # 1 for allocated, 0 for free
             "grid": spaces.Box(low=0, high=grid_max, shape=grid_size, dtype=int),
         })
