@@ -12,4 +12,4 @@ done = False
 while not done:
     action = env.action_space.sample()
     observation, reward, done, _, info = env.step(action)
-    print(observation, reward, info)
+    # print(observation, reward, info)
