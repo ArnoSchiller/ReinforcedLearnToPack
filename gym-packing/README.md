@@ -5,6 +5,7 @@ python -m venv env
 env\Scripts\activate
 
 pip install -e .
+pip install -r requirements.txt
 
 # run random agent
 python play_random.py
