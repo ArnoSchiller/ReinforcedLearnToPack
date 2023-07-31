@@ -51,18 +51,12 @@ class Packing2DWorldEnv(gym.Env):
         for article in order.articles:
             for _ in range(article.amount):
                 # Create item objects from the order articles
-                self._items.append(Item(
-                    id=article.article_id,
-                    width=article.width,
-                    length=article.length,
-                    height=article.height,
-                    weight=article.weight
-                ))
+                self._items.append(Item.from_article(article))
 
         # Define the observation space
         grid_size = (self.size[0],) if self.use_height_map else self.size
         grid_max = self.size[1] + 1 if self.use_height_map else 1
-        print(grid_size)
+        # print(grid_size)
         self.observation_space = spaces.Dict({
             # dimension and position of the item in 2D space
             "item": spaces.Box(low=0, high=max(size), shape=(4,), dtype=int),
@@ -138,7 +132,7 @@ class Packing2DWorldEnv(gym.Env):
             step (int or None): The step size to move the item. If None, the item is reset to the leftmost position.
         """
         if step is None:
-            new_x = 0
+            new_x = self._bin.width // 2 - self._current_item.width // 2
         else:
             # Move left if step is -1, otherwise move right
             new_x = self._current_item.position.x + step
@@ -226,8 +220,8 @@ class Packing2DWorldEnv(gym.Env):
         if self.render_mode == "human":
             self._render_frame()
 
-        if done:
-            print(observation, info, reward)
+        # if done:
+        #    print(observation, info, reward)
         return observation, reward, done, False, info
 
     def render(self):

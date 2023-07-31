@@ -4,7 +4,7 @@ import gym_packing
 from gymnasium.wrappers import FlattenObservation
 
 env = gymnasium.make("gym_packing/Packing2DWorld-v0",
-                     size=(5, 10),
+                     size=(10, 10),
                      use_height_map=True,
                      render_mode="human")
 env = FlattenObservation(env)

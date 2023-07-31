@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 
 gym-examples
+gym-packing/log
+*.zip
