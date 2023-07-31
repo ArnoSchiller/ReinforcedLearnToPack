@@ -34,7 +34,7 @@ To build this project, the requirements are divided into different scenarios. To
 ## ToDos
 - [X] Include stability check when packing items (implemented in PackingUtils)
 - [X] Redefine the action space as the possible solutions (Environment v2)
-- [ ] Train with another model
+- [X] Train with another model (included DQN)
 
 ## Info / Source
 This code is bases on the OpenAI Gymnasium [Tutorial](https://gymnasium.farama.org/tutorials/gymnasium_basics/environment_creation) on building own environments. Also see [Gymnasium documentation](https://gymnasium.farama.org).
