@@ -7,7 +7,9 @@ from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 # Parallel environments
 
-env = gymnasium.make(c.ENVIRONMENT, render_mode="human")
+env = gymnasium.make(c.ENVIRONMENT,
+                     size=c.CONTAINER_SIZE,
+                     use_height_map=True)
 env = FlattenObservation(env)
 
 obs = env.reset()

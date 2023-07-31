@@ -32,14 +32,9 @@ To build this project, the requirements are divided into different scenarios. To
   - for each correct placed item: +1 
   - for a wrong placement: -100 and game over
 ## ToDos
-- [x] Setup the initial gymnasion environment 
-- [X] Write the concept
-- [X] Redefine the action space
-- [ ] Redefine the observation space (grid + item)
-- [ ] Update step with new actions and observations
-- [ ] Update render function
-- [ ] Combine env with RL
-- [ ] Write test cases 
+- [X] Include stability check when packing items (implemented in PackingUtils)
+- [X] Redefine the action space as the possible solutions (Environment v2)
+- [ ] Train with another model
 
 ## Info / Source
 This code is bases on the OpenAI Gymnasium [Tutorial](https://gymnasium.farama.org/tutorials/gymnasium_basics/environment_creation) on building own environments. Also see [Gymnasium documentation](https://gymnasium.farama.org).

@@ -59,13 +59,13 @@ class Packing2DWorldEnvV2(gym.Env):
         # print(grid_size)
         self.observation_space = spaces.Dict({
             # dimension and position of the item in 2D space
-            "item": spaces.Box(low=0, high=max(size), shape=(4,), dtype=int),
+            "item": spaces.Box(low=0, high=max(size), shape=(2,), dtype=int),
             # 1 for allocated, 0 for free
             "grid": spaces.Box(low=0, high=grid_max, shape=grid_size, dtype=int),
         })
 
-        # Define the action space
-        self.action_space = spaces.Discrete(3)  # "right", "left", "pack"
+        # Define the action space (each possible x position)
+        self.action_space = spaces.Discrete(self.size[0])
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -83,9 +83,7 @@ class Packing2DWorldEnvV2(gym.Env):
         """
         item_obs = np.array([
             self._current_item.width,
-            self._current_item.height,
-            self._current_item.position.x,
-            self._current_item.position.z
+            self._current_item.height
         ], dtype=int)
         return {"item": item_obs, "grid": self._matrix.flatten()}
 
@@ -124,29 +122,6 @@ class Packing2DWorldEnvV2(gym.Env):
 
         return matrix  # height x width
 
-    def _move_item(self, step: 'int | None'):
-        """
-        Move the current item in the packing area.
-
-        Args:
-            step (int or None): The step size to move the item. If None, the item is reset to the leftmost position.
-        """
-        if step is None:
-            new_x = self._bin.width // 2 - self._current_item.width // 2
-        else:
-            # Move left if step is -1, otherwise move right
-            new_x = self._current_item.position.x + step
-            if new_x < 0 or new_x + self._current_item.width > self._bin.width:
-                return
-
-        if self.use_height_map:
-            z = max(self._matrix[new_x: new_x + self._current_item.width])
-        else:
-            rows, _ = np.where(
-                self._matrix[:, new_x: new_x + self._current_item.width])
-            z = max(rows) + 1 if len(rows) > 0 else 0
-        self._current_item.position = Position(x=new_x, y=0, z=z)
-
     def reset(self, seed=None, options=None):
         """
         Reset the environment to its initial state.
@@ -170,7 +145,9 @@ class Packing2DWorldEnvV2(gym.Env):
 
         self._items_to_pack = [item for item in self._items]
         self._current_item = self._items_to_pack[0]
-        self._move_item(step=None)  # Reset position
+        self._current_item.position = None
+
+        self.failed_counter = 0
 
         observation = self._get_obs()
         info = self._get_info()
@@ -193,25 +170,34 @@ class Packing2DWorldEnvV2(gym.Env):
         done = False
         reward = 0
 
-        if action == 0:  # Move left
-            self._move_item(step=-1)
-        elif action == 1:  # Move right
-            self._move_item(step=1)
-        elif action == 2:  # Pack the item
-            is_packed, msg = self._bin.pack_item(self._current_item)
-            if msg is not None:
-                pass  # print(msg)
-            if is_packed:
-                reward += 10
-                self._items_to_pack.remove(self._current_item)
-                if len(self._items_to_pack) > 0:
-                    self._current_item = self._items_to_pack[0]
-                    self._move_item(step=None)
-                else:
-                    reward += 100
-                    done = True
+        prev_max_z = np.max(self._matrix, axis=0 if self.use_height_map else 1)
+        new_x = action
+        if self.use_height_map:
+            z = max(self._matrix[new_x: new_x + self._current_item.width])
+        else:
+            rows, _ = np.where(
+                self._matrix[:, new_x: new_x + self._current_item.width])
+            z = max(rows) + 1 if len(rows) > 0 else 0
+        self._current_item.position = Position(x=new_x, y=0, z=z)
+
+        is_packed, msg = self._bin.pack_item(self._current_item)
+        if msg is not None:
+            pass  # print(msg)
+        if is_packed:
+            self.failed_counter = 0
+            new_max_z = np.max(
+                self._matrix, axis=0 if self.use_height_map else 1)
+            reward += 100 - (new_max_z - prev_max_z) * 10
+            self._items_to_pack.remove(self._current_item)
+            if len(self._items_to_pack) > 0:
+                self._current_item = self._items_to_pack[0]
             else:
-                reward -= 100
+                reward += 1000
+                done = True
+        else:
+            self.failed_counter += 1
+            reward -= 100
+            if self.failed_counter > 5:
                 done = True
 
         observation = self._get_obs()
@@ -264,16 +250,6 @@ class Packing2DWorldEnvV2(gym.Env):
                     (pix_square_size * item.width, pix_square_size * item.height),
                 ),
             )
-
-        position = np.array([self._current_item.position.x,
-                            self._current_item.position.z], dtype=int)
-        # Now we draw the agent
-        pygame.draw.circle(
-            canvas,
-            (0, 0, 255),
-            (position + 0.5) * pix_square_size,
-            pix_square_size / 3,
-        )
 
         # horizontal lines
         for x in range(self.size[1] + 1):
