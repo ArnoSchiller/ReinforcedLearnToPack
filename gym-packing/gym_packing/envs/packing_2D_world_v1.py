@@ -9,7 +9,7 @@ from packutils.data.article import Article
 from packutils.data.position import Position
 
 
-class Packing2DWorldEnv(gym.Env):
+class Packing2DWorldEnvV1(gym.Env):
     """
     Gym environment for 2D packing problems.
     """

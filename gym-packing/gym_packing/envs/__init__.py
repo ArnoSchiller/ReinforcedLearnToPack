@@ -1,1 +1,2 @@
-from gym_packing.envs.packing_2D_world import Packing2DWorldEnv
+from gym_packing.envs.packing_2D_world_v1 import Packing2DWorldEnvV1
+from gym_packing.envs.packing_2D_world_v2 import Packing2DWorldEnvV2

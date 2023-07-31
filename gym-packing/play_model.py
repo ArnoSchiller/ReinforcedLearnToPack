@@ -1,12 +1,14 @@
 import gymnasium
 import gym_packing
 
+import constants as c
+
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 
 
 model = PPO.load("packing_2d_v0_test")
-env = gymnasium.make("gym_packing/Packing2DWorld-v0", render_mode="human")
+env = gymnasium.make(c.ENVIRONMENT, render_mode="human")
 env = FlattenObservation(env)
 
 done = False

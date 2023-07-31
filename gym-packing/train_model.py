@@ -1,11 +1,13 @@
 import gymnasium
 import gym_packing
 
+import constants as c
+
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO
 # Parallel environments
 
-env = gymnasium.make("gym_packing/Packing2DWorld-v0", render_mode="human")
+env = gymnasium.make(c.ENVIRONMENT, render_mode="human")
 env = FlattenObservation(env)
 
 obs = env.reset()
