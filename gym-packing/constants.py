@@ -1,2 +1,6 @@
 ENVIRONMENT = "gym_packing/Packing2DWorld-v2"
 CONTAINER_SIZE = (40, 10)
+
+VERBOSE = 0
+MODEL_NAME = "PPO"
+N_STEPS = 2000

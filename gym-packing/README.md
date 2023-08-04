@@ -35,6 +35,17 @@ To build this project, the requirements are divided into different scenarios. To
 - [X] Include stability check when packing items (implemented in PackingUtils)
 - [X] Redefine the action space as the possible solutions (Environment v2)
 - [X] Train with another model (included DQN)
+- [X] Include AdditionalTensorboardLogs
+- [ ] Implement training parallel envs
+- [ ] Add random order on reset
+- [ ] Add Action Noise
 
 ## Info / Source
 This code is bases on the OpenAI Gymnasium [Tutorial](https://gymnasium.farama.org/tutorials/gymnasium_basics/environment_creation) on building own environments. Also see [Gymnasium documentation](https://gymnasium.farama.org).
+
+The used models are implemented in [Stable Baseline 3](https://stable-baselines3.readthedocs.io/en/master/).
+
+### Show tensorboard logs
+```bash
+tensorboard --logdir training/tb_logs
+```
