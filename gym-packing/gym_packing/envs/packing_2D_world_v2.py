@@ -3,19 +3,14 @@ import gymnasium as gym
 from gymnasium import spaces
 import pygame
 import numpy as np
+
 from packutils.data.bin import Bin
 from packutils.data.item import Item
 from packutils.data.order import Order
 from packutils.data.article import Article
 from packutils.data.position import Position
 
-from enum import Enum
-
-
-class RewardStrategy(Enum):
-    REWARD_ALL_ITEMS_PACKED = 0
-    REWARD_EACH_ITEM_PACKED = 1
-    REWARD_COMPACTNESS = 2
+from gym_packing.envs.reward_strategies import RewardStrategy
 
 
 class Packing2DWorldEnvV2(gym.Env):
@@ -26,8 +21,7 @@ class Packing2DWorldEnvV2(gym.Env):
 
     def __init__(
             self,
-            reward_strategies: List[RewardStrategy] = [
-                RewardStrategy.REWARD_COMPACTNESS],
+            reward_strategies: List[RewardStrategy],
             render_mode=None, size=(40, 20), use_height_map=True):
         """
         Initialize the packing environment.
@@ -40,6 +34,8 @@ class Packing2DWorldEnvV2(gym.Env):
         self.window_size = 512
         self.use_height_map = use_height_map
 
+        if len(reward_strategies) < 1:
+            raise ValueError("You must provide at least one reward strategy.")
         self.reward_strategies = reward_strategies
 
         # Create a sample order
@@ -186,6 +182,8 @@ class Packing2DWorldEnvV2(gym.Env):
         reward = 0
 
         prev_max_z = np.max(self._matrix, axis=0 if self.use_height_map else 1)
+        prev_compactness = self._calculate_compactness()
+
         new_x = action
         if self.use_height_map:
             z = max(self._matrix[new_x: new_x + self._current_item.width])
@@ -201,29 +199,23 @@ class Packing2DWorldEnvV2(gym.Env):
         if is_packed:
             self.failed_counter = 0
             if RewardStrategy.REWARD_EACH_ITEM_PACKED in self.reward_strategies:
+                reward += 20
+
+            if RewardStrategy.REWARD_EACH_ITEM_PACKED_HEIGHT in self.reward_strategies:
                 new_max_z = np.max(
                     self._matrix, axis=0 if self.use_height_map else 1)
                 reward += 100 - (new_max_z - prev_max_z) * 10
+
+            if RewardStrategy.REWARD_EACH_ITEM_PACKED_COMPACTNESS in self.reward_strategies:
+                compactness = self._calculate_compactness()
+                reward += 100 - (compactness - prev_compactness) * 10
+
             self._items_to_pack.remove(self._current_item)
             if len(self._items_to_pack) > 0:
                 self._current_item = self._items_to_pack[0]
             else:
                 if RewardStrategy.REWARD_COMPACTNESS in self.reward_strategies:
-                    if self.use_height_map:
-                        min_z = np.min(self._matrix, axis=0)
-                        max_z = np.max(self._matrix, axis=0)
-                        min_x = np.argmax(self._matrix > 0)
-                        max_x = self._matrix.shape[0] - \
-                            np.argmax(np.flip(self._matrix) > 0)
-                    else:
-                        max_z = np.max(self._matrix, axis=1)
-                        min_z = np.min(self._matrix, axis=1)
-
-                    used_volume = self._bin.get_used_volume()
-                    allocated_volume = (max_z - min_z) * (max_x - min_x)
-
-                    compactness = used_volume / allocated_volume
-
+                    compactness = self._calculate_compactness()
                     reward += compactness * 100
 
                 if RewardStrategy.REWARD_ALL_ITEMS_PACKED in self.reward_strategies:
@@ -232,7 +224,8 @@ class Packing2DWorldEnvV2(gym.Env):
                 done = True
         else:
             self.failed_counter += 1
-            reward -= 100
+            if RewardStrategy.NEGATIVE_REWARD_PACKING_FAILED in self.reward_strategies:
+                reward -= 100
             if self.failed_counter > 5:
                 done = True
 
@@ -326,3 +319,23 @@ class Packing2DWorldEnvV2(gym.Env):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+
+    def _calculate_compactness(self):
+        if self.use_height_map:
+            min_z = np.min(self._matrix, axis=0)
+            max_z = np.max(self._matrix, axis=0)
+            min_x = np.argmax(self._matrix > 0)
+            max_x = self._matrix.shape[0] - \
+                np.argmax(np.flip(self._matrix) > 0)
+        else:
+            max_z = np.max(self._matrix, axis=1)
+            min_z = np.min(self._matrix, axis=1)
+
+        used_volume = self._bin.get_used_volume()
+        allocated_volume = (max_z - min_z) * (max_x - min_x)
+
+        if allocated_volume == 0:
+            return 1
+
+        compactness = used_volume / allocated_volume
+        return compactness
