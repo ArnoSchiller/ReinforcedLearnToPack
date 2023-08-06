@@ -36,9 +36,12 @@ To build this project, the requirements are divided into different scenarios. To
 - [X] Redefine the action space as the possible solutions (Environment v2)
 - [X] Train with another model (included DQN)
 - [X] Include AdditionalTensorboardLogs
-- [ ] Implement training parallel envs
+- [ ] Normalize action and observation space
 - [ ] Add random order on reset
 - [ ] Add Action Noise
+- [ ] Include pybullet (https://stable-baselines3.readthedocs.io/en/master/guide/examples.html)
+- [ ] Implement training parallel envs
+- [ ] Implement GIF saving (https://stable-baselines3.readthedocs.io/en/master/guide/examples.html)
 
 ## Info / Source
 This code is bases on the OpenAI Gymnasium [Tutorial](https://gymnasium.farama.org/tutorials/gymnasium_basics/environment_creation) on building own environments. Also see [Gymnasium documentation](https://gymnasium.farama.org).
