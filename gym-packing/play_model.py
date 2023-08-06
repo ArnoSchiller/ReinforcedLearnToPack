@@ -1,3 +1,4 @@
+import os
 import gymnasium
 import gym_packing
 
@@ -7,8 +8,15 @@ from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO, DQN
 
 
-model = PPO.load("packing_2d_v2_PPO_1")
-# model = DQN.load("packing_2d_v2_DQN")
+model_dir = "p2d_v2_PPO_1"
+model_weights = "best_model"
+model_path = os.path.join("training", model_dir, model_weights)
+
+if model_dir.count("PPO") > 0:
+    model = PPO.load(model_path)
+elif model_dir.count("DQN") > 0:
+    model = DQN.load("packing_2d_v2_DQN")
+
 env = gymnasium.make(c.ENVIRONMENT,
                      size=c.CONTAINER_SIZE,
                      use_height_map=True, render_mode="human")
