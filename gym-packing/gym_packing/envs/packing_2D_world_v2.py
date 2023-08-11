@@ -1,3 +1,6 @@
+import copy
+import logging
+import random
 from typing import List
 import gymnasium as gym
 from gymnasium import spaces
@@ -7,7 +10,6 @@ import numpy as np
 from packutils.data.bin import Bin
 from packutils.data.item import Item
 from packutils.data.order import Order
-from packutils.data.article import Article
 from packutils.data.position import Position
 
 from gym_packing.envs.reward_strategies import RewardStrategy
@@ -21,8 +23,13 @@ class Packing2DWorldEnvV2(gym.Env):
 
     def __init__(
             self,
+            articles,
+            max_articles_per_order,
             reward_strategies: List[RewardStrategy],
-            render_mode=None, size=(40, 20), use_height_map=True):
+            size=(40, 20),
+            use_height_map=True,
+            render_mode=None,
+    ):
         """
         Initialize the packing environment.
 
@@ -30,6 +37,9 @@ class Packing2DWorldEnvV2(gym.Env):
             render_mode (str): The rendering mode ("human" or "rgb_array").
             size (tuple): The size of the packing area (width, height).
         """
+        self.articles = articles
+        self.max_articles_per_order = max_articles_per_order
+
         self.size = size
         self.window_size = 512
         self.use_height_map = use_height_map
@@ -37,32 +47,6 @@ class Packing2DWorldEnvV2(gym.Env):
         if len(reward_strategies) < 1:
             raise ValueError("You must provide at least one reward strategy.")
         self.reward_strategies = reward_strategies
-
-        # Create a sample order
-        order = Order(
-            order_id="test",
-            articles=[
-                Article(
-                    article_id="article large",
-                    width=4,
-                    length=1,
-                    height=4,
-                    amount=10
-                ),
-                Article(
-                    article_id="article small",
-                    width=2,
-                    length=1,
-                    height=2,
-                    amount=30
-                )
-            ])
-
-        self._items = []
-        for article in order.articles:
-            for _ in range(article.amount):
-                # Create item objects from the order articles
-                self._items.append(Item.from_article(article))
 
         # Define the observation space
         grid_size = (self.size[0],) if self.use_height_map else self.size
@@ -84,6 +68,28 @@ class Packing2DWorldEnvV2(gym.Env):
         # Initialize PyGame window and clock for rendering
         self.window = None
         self.clock = None
+
+    def generate_order(self):
+        if self.max_articles_per_order is None:
+            order = Order(
+                order_id="test",
+                articles=self.articles)
+        else:
+            _articles = copy.deepcopy(self.articles)
+            for a in _articles:
+                a.amount = 0
+            for _ in range(self.max_articles_per_order):
+                _articles[random.randint(0, len(_articles)-1)].amount += 1
+            order = Order(
+                order_id="test",
+                articles=_articles)
+
+        logging.info(order)
+        self._items = []
+        for article in order.articles:
+            for _ in range(article.amount):
+                # Create item objects from the order articles
+                self._items.append(Item.from_article(article))
 
     def _get_obs(self):
         """
@@ -147,6 +153,7 @@ class Packing2DWorldEnvV2(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
+        self.generate_order()
         # Create a new packing bin
         self._bin = Bin(
             width=self.size[0],

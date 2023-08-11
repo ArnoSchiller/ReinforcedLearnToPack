@@ -28,20 +28,25 @@ MODEL_DIR = os.path.join("training", f"{model_name}_{i}")
 
 env = gymnasium.make(
     c.ENVIRONMENT,
+    articles=c.ARTICLES,
+    max_articles_per_order=c.MAX_ARTICLES,
+    reward_strategies=c.REWARD_STRATEGIES,
     size=c.CONTAINER_SIZE,
-    use_height_map=c.USE_HEIGHT_MAP,
-    reward_strategies=c.REWARD_STRATEGIES
+    use_height_map=c.USE_HEIGHT_MAP
 )
 env = FlattenObservation(env)
 env = Monitor(env, f"{MODEL_DIR}/model")
 obs = env.reset()
 print(obs)
 
-eval_env = gymnasium.make(
+eval_env = gymnasium.vector.make(
     c.ENVIRONMENT,
+    num_envs=12,
+    articles=c.ARTICLES,
+    max_articles_per_order=None,
+    reward_strategies=c.REWARD_STRATEGIES,
     size=c.CONTAINER_SIZE,
-    use_height_map=c.USE_HEIGHT_MAP,
-    reward_strategies=c.REWARD_STRATEGIES
+    use_height_map=c.USE_HEIGHT_MAP
 )
 eval_env = FlattenObservation(eval_env)
 
