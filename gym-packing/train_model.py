@@ -39,9 +39,8 @@ env = Monitor(env, f"{MODEL_DIR}/model")
 obs = env.reset()
 print(obs)
 
-eval_env = gymnasium.vector.make(
+eval_env = gymnasium.make(
     c.ENVIRONMENT,
-    num_envs=12,
     articles=c.ARTICLES,
     max_articles_per_order=None,
     reward_strategies=c.REWARD_STRATEGIES,
