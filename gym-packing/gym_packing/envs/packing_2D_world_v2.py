@@ -238,9 +238,11 @@ class Packing2DWorldEnvV2(gym.Env):
                 done = True
         else:
             self.failed_counter += 1
-            if RewardStrategy.PENALIZE_PACKING_FAILED in self.reward_strategies:
-                reward -= 100
-            if self.failed_counter > 5:
+            if RewardStrategy.PENALIZE_EACH_ITEM_PACKING_FAILED in self.reward_strategies:
+                reward -= 50
+            if self.failed_counter > 10:
+                if RewardStrategy.PENALIZE_PACKING_FAILED in self.reward_strategies:
+                    reward -= 100
                 done = True
 
         observation = self._get_obs()
