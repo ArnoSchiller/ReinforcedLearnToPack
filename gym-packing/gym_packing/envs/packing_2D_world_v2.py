@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 import random
 from typing import List
 import gymnasium as gym
@@ -217,6 +218,13 @@ class Packing2DWorldEnvV2(gym.Env):
                 compactness = self._calculate_compactness()
                 reward += 100 - (compactness - prev_compactness) * 10
 
+            if RewardStrategy.PENALIZE_EACH_ITEM_DISTANCE_COG in self.reward_strategies:
+                cog = self._bin.get_center_of_gravity()
+                pos = self._current_item.position
+                distance_to_cog = int(math.sqrt(
+                    (pos.x - cog.x)**2 + (pos.y - cog.y)**2 + (pos.z - cog.z)**2))
+                reward -= distance_to_cog
+
             self._items_to_pack.remove(self._current_item)
             if len(self._items_to_pack) > 0:
                 self._current_item = self._items_to_pack[0]
@@ -227,11 +235,10 @@ class Packing2DWorldEnvV2(gym.Env):
 
                 if RewardStrategy.REWARD_ALL_ITEMS_PACKED in self.reward_strategies:
                     reward += 100
-
                 done = True
         else:
             self.failed_counter += 1
-            if RewardStrategy.NEGATIVE_REWARD_PACKING_FAILED in self.reward_strategies:
+            if RewardStrategy.PENALIZE_PACKING_FAILED in self.reward_strategies:
                 reward -= 100
             if self.failed_counter > 5:
                 done = True
