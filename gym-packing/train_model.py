@@ -10,6 +10,7 @@ from stable_baselines3 import PPO, DQN,  A2C
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.noise import NormalActionNoise
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 import gym_packing
 from gym_packing.callbacks import AdditionalTensorboardLogsCallback
@@ -26,6 +27,7 @@ while os.path.exists(MODEL_DIR):
     MODEL_DIR = os.path.join(TB_LOGS, f"{model_name}_{i}")
 MODEL_DIR = os.path.join("training", f"{model_name}_{i}")
 
+"""
 env = gymnasium.make(
     c.ENVIRONMENT,
     articles=c.ARTICLES,
@@ -35,22 +37,35 @@ env = gymnasium.make(
     use_height_map=c.USE_HEIGHT_MAP
 )
 env = FlattenObservation(env)
-env = Monitor(env, f"{MODEL_DIR}/model")
+"""
+env = DummyVecEnv([
+    lambda: gymnasium.make(
+        c.ENVIRONMENT,
+        articles=c.ARTICLES,
+        max_articles_per_order=c.MAX_ARTICLES,
+        reward_strategies=c.REWARD_STRATEGIES,
+        size=c.CONTAINER_SIZE,
+        use_height_map=c.USE_HEIGHT_MAP
+    ) for _ in range(c.NUM_ENVS)
+])
+# env = Monitor(env, f"{MODEL_DIR}/model")
+
 obs = env.reset()
 print(obs)
 
-eval_env = gymnasium.make(
-    c.ENVIRONMENT,
-    articles=c.ARTICLES,
-    max_articles_per_order=None,
-    reward_strategies=c.REWARD_STRATEGIES,
-    size=c.CONTAINER_SIZE,
-    use_height_map=c.USE_HEIGHT_MAP
-)
-eval_env = FlattenObservation(eval_env)
+eval_env = DummyVecEnv([
+    lambda: gymnasium.make(
+        c.ENVIRONMENT,
+        articles=c.ARTICLES,
+        max_articles_per_order=None,
+        reward_strategies=c.REWARD_STRATEGIES,
+        size=c.CONTAINER_SIZE,
+        use_height_map=c.USE_HEIGHT_MAP
+    ) for _ in range(c.NUM_ENVS)
+])
 
 eval_callback = EvalCallback(eval_env, best_model_save_path=MODEL_DIR,
-                             log_path=MODEL_DIR+"/eval", eval_freq=5000)
+                             log_path=MODEL_DIR+"/eval", eval_freq=5000/c.NUM_ENVS)
 callback_on_best = StopTrainingOnRewardThreshold(
     reward_threshold=-200, verbose=1)
 checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=MODEL_DIR)
@@ -103,7 +118,7 @@ model = MODEL(
 )
 
 constants_fname = "constants.py"
-shutil.copy(constants_fname, os.path.join(MODEL_DIR, constants_fname))
+# shutil.copy(constants_fname, os.path.join(MODEL_DIR, constants_fname))
 
 model.learn(
     total_timesteps=c.N_STEPS,
