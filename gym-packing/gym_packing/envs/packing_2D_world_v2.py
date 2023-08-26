@@ -260,6 +260,21 @@ class Packing2DWorldEnvV2(gym.Env):
             if RewardStrategy.PENALIZE_EACH_PACKED_HEIGHT in self.reward_strategies:
                 reward -= 4 * self._current_item.position.z
 
+            if RewardStrategy.PENALIZE_EACH_DISTANCE_NEXT_ITEM:
+                x_min = self._current_item.position.x
+                x_max = x_min + self._current_item.width
+                z = self._current_item.position.z
+                if self.use_height_map:
+                    left_items = np.where(self._matrix[:x_min] > z)
+                    if len(left_items) > 0:
+                        distance_left = x_min - np.max(left_items) - 1
+                    else:
+                        distance_left = x_min
+                else:
+                    raise NotImplementedError()
+
+                reward += 10 * distance_left
+
         # failed to pack current item
         else:
             if RewardStrategy.PENALIZE_EACH_PACKING_FAILED in self.reward_strategies:
