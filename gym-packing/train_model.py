@@ -112,8 +112,10 @@ elif c.MODEL_NAME == "A2C":
     MODEL = A2C
 
 model = MODEL(
-    c.POLICY, env,
-    # learning_rate=learning_rate,
+    policy=c.POLICY,
+    env=env,
+    ent_coef=0.01,
+    # learning_rate=c.LEARNING_RATE,
     tensorboard_log=TB_LOGS
 )
 

@@ -25,7 +25,7 @@ env = gymnasium.make(
     size=c.CONTAINER_SIZE,
     use_height_map=c.USE_HEIGHT_MAP,
     render_mode="human")
-env = FlattenObservation(env)
+# env = FlattenObservation(env)
 
 done = False
 obs, info = env.reset()

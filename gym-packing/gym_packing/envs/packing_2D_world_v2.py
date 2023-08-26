@@ -167,6 +167,8 @@ class Packing2DWorldEnvV2(gym.Env):
         self._current_item.position = None
 
         self.failed_counter = 0
+        self.prev_max_z = 0
+        self.prev_compactness = 0
 
         observation = self._get_obs()
         info = self._get_info()
@@ -189,8 +191,9 @@ class Packing2DWorldEnvV2(gym.Env):
         done = False
         reward = 0
 
-        prev_max_z = np.max(self._matrix, axis=0 if self.use_height_map else 1)
-        prev_compactness = self._calculate_compactness()
+        self.prev_max_z = np.max(
+            self._matrix, axis=0 if self.use_height_map else 1)
+        self.prev_compactness = self._calculate_compactness()
 
         new_x = action
         if self.use_height_map:
@@ -202,48 +205,23 @@ class Packing2DWorldEnvV2(gym.Env):
         self._current_item.position = Position(x=new_x, y=0, z=z)
 
         is_packed, msg = self._bin.pack_item(self._current_item)
+
         if msg is not None:
             pass  # print(msg)
+
         if is_packed:
             self.failed_counter = 0
-            if RewardStrategy.REWARD_EACH_ITEM_PACKED in self.reward_strategies:
-                reward += 20
-
-            if RewardStrategy.REWARD_EACH_ITEM_PACKED_HEIGHT in self.reward_strategies:
-                new_max_z = np.max(
-                    self._matrix, axis=0 if self.use_height_map else 1)
-                reward += 100 - (new_max_z - prev_max_z) * 10
-
-            if RewardStrategy.REWARD_EACH_ITEM_PACKED_COMPACTNESS in self.reward_strategies:
-                compactness = self._calculate_compactness()
-                reward += 100 - (compactness - prev_compactness) * 10
-
-            if RewardStrategy.PENALIZE_EACH_ITEM_DISTANCE_COG in self.reward_strategies:
-                cog = self._bin.get_center_of_gravity()
-                pos = self._current_item.position
-                distance_to_cog = int(math.sqrt(
-                    (pos.x - cog.x)**2 + (pos.y - cog.y)**2 + (pos.z - cog.z)**2))
-                reward -= distance_to_cog
-
             self._items_to_pack.remove(self._current_item)
             if len(self._items_to_pack) > 0:
                 self._current_item = self._items_to_pack[0]
             else:
-                if RewardStrategy.REWARD_COMPACTNESS in self.reward_strategies:
-                    compactness = self._calculate_compactness()
-                    reward += compactness * 100
-
-                if RewardStrategy.REWARD_ALL_ITEMS_PACKED in self.reward_strategies:
-                    reward += 100
                 done = True
         else:
             self.failed_counter += 1
-            if RewardStrategy.PENALIZE_EACH_ITEM_PACKING_FAILED in self.reward_strategies:
-                reward -= 50
             if self.failed_counter > 10:
-                if RewardStrategy.PENALIZE_PACKING_FAILED in self.reward_strategies:
-                    reward -= 100
                 done = True
+
+        reward = self.calculate_reward(is_packed, done)
 
         observation = self._get_obs()
         info = self._get_info()
@@ -254,6 +232,53 @@ class Packing2DWorldEnvV2(gym.Env):
         # if done:
         #    print(observation, info, reward)
         return observation, reward, done, False, info
+
+    def calculate_reward(self, is_packed, done):
+        reward = 0
+
+        # packed current item successfully
+        if is_packed:
+            if RewardStrategy.REWARD_EACH_PACKED in self.reward_strategies:
+                reward += 20
+
+            if RewardStrategy.REWARD_EACH_HEIGHT_CHANGE in self.reward_strategies:
+                new_max_z = np.max(
+                    self._matrix, axis=0 if self.use_height_map else 1)
+                reward += 100 - (new_max_z - self.prev_max_z) * 10
+
+            if RewardStrategy.REWARD_EACH_COMPACTNESS in self.reward_strategies:
+                compactness = self._calculate_compactness()
+                reward += 100 - (compactness - self.prev_compactness) * 10
+
+            if RewardStrategy.PENALIZE_EACH_DISTANCE_COG in self.reward_strategies:
+                cog = self._bin.get_center_of_gravity()
+                pos = self._current_item.position
+                distance_to_cog = int(math.sqrt(
+                    (pos.x - cog.x)**2 + (pos.y - cog.y)**2 + (pos.z - cog.z)**2))
+                reward -= distance_to_cog
+
+            if RewardStrategy.PENALIZE_EACH_PACKED_HEIGHT in self.reward_strategies:
+                reward -= 4 * self._current_item.position.z
+
+        # failed to pack current item
+        else:
+            if RewardStrategy.PENALIZE_EACH_PACKING_FAILED in self.reward_strategies:
+                reward -= 50
+
+        # last item packed successfully
+        if done and is_packed:
+            if RewardStrategy.REWARD_ALL_COMPACTNESS in self.reward_strategies:
+                compactness = self._calculate_compactness()
+                reward += compactness * 100
+
+            if RewardStrategy.REWARD_ALL_PACKED in self.reward_strategies:
+                reward += 100
+
+        # failed to pack order
+        if done and not is_packed:
+            if RewardStrategy.PENALIZE_ALL_PACKING_FAILED in self.reward_strategies:
+                reward -= 100
+        return reward
 
     def render(self):
         """
