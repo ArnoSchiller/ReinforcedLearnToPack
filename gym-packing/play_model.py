@@ -8,7 +8,7 @@ from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import PPO, DQN
 
 
-model_dir = "p2d_v2_PPO_1"
+model_dir = "p2d_v2_PPO_12"
 model_weights = "best_model"
 model_path = os.path.join("training", model_dir, model_weights)
 
@@ -30,6 +30,7 @@ env = gymnasium.make(
 done = False
 obs, info = env.reset()
 print(obs)
+
 while not done:
     action, _states = model.predict(obs)
     print("Action:", action)

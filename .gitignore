@@ -164,3 +164,4 @@ cython_debug/
 gym-examples
 gym-packing/log
 *.zip
+*.npz

@@ -111,13 +111,16 @@ elif c.MODEL_NAME == "DQN":
 elif c.MODEL_NAME == "A2C":
     MODEL = A2C
 
-model = MODEL(
-    policy=c.POLICY,
-    env=env,
-    ent_coef=0.01,
-    # learning_rate=c.LEARNING_RATE,
-    tensorboard_log=TB_LOGS
-)
+if c.PRETRAINED_MODEL_PATH != None:
+    model = MODEL.load(c.PRETRAINED_MODEL_PATH, env=env)
+else:
+    model = MODEL(
+        policy=c.POLICY,
+        env=env,
+        ent_coef=0.1,
+        # learning_rate=c.LEARNING_RATE,
+        tensorboard_log=TB_LOGS
+    )
 
 constants_fname = "constants.py"
 # shutil.copy(constants_fname, os.path.join(MODEL_DIR, constants_fname))
