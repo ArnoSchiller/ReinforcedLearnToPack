@@ -12,6 +12,9 @@ from packutils.data.bin import Bin
 from packutils.data.item import Item
 from packutils.data.order import Order
 from packutils.data.position import Position
+from packutils.data.article import Article
+
+from packutils.solver.palletier_packer import PalletierPacker
 
 from gym_packing.envs.reward_strategies import RewardStrategy
 
@@ -29,6 +32,7 @@ class Packing2DWorldEnvV2(gym.Env):
             reward_strategies: List[RewardStrategy],
             size=(40, 20),
             use_height_map=True,
+            run_expert=False,
             render_mode=None,
     ):
         """
@@ -44,6 +48,7 @@ class Packing2DWorldEnvV2(gym.Env):
         self.size = size
         self.window_size = 512
         self.use_height_map = use_height_map
+        self.run_expert = run_expert
 
         if len(reward_strategies) < 1:
             raise ValueError("You must provide at least one reward strategy.")
@@ -85,12 +90,27 @@ class Packing2DWorldEnvV2(gym.Env):
                 order_id="test",
                 articles=_articles)
 
-        logging.info(order)
-        self._items = []
-        for article in order.articles:
-            for _ in range(article.amount):
-                # Create item objects from the order articles
-                self._items.append(Item.from_article(article))
+        if self.run_expert:
+            self.expert_actions = []
+            solver = PalletierPacker(bins=[self._bin])
+            result = solver.pack_variant(order)
+
+            self._items = []
+            for package in result.bins[0].packed_items:
+
+                action = package.position.x
+                self.expert_actions.append(action)
+
+                package.position = None
+                self._items.append(package)
+
+        else:
+            logging.info(order)
+            self._items = []
+            for article in order.articles:
+                for _ in range(article.amount):
+                    # Create item objects from the order articles
+                    self._items.append(Item.from_article(article))
 
     def _get_obs(self):
         """
@@ -154,13 +174,14 @@ class Packing2DWorldEnvV2(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
-        self.generate_order()
         # Create a new packing bin
         self._bin = Bin(
             width=self.size[0],
             length=1,
             height=self.size[1]
         )
+
+        self.generate_order()
 
         self._items_to_pack = [item for item in self._items]
         self._current_item = self._items_to_pack[0]
@@ -212,9 +233,7 @@ class Packing2DWorldEnvV2(gym.Env):
         if is_packed:
             self.failed_counter = 0
             self._items_to_pack.remove(self._current_item)
-            if len(self._items_to_pack) > 0:
-                self._current_item = self._items_to_pack[0]
-            else:
+            if len(self._items_to_pack) < 1:
                 done = True
         else:
             self.failed_counter += 1
@@ -222,6 +241,9 @@ class Packing2DWorldEnvV2(gym.Env):
                 done = True
 
         reward = self.calculate_reward(is_packed, done)
+
+        if not done and is_packed:
+            self._current_item = self._items_to_pack[0]
 
         observation = self._get_obs()
         info = self._get_info()
@@ -258,14 +280,14 @@ class Packing2DWorldEnvV2(gym.Env):
                 reward -= distance_to_cog
 
             if RewardStrategy.PENALIZE_EACH_PACKED_HEIGHT in self.reward_strategies:
-                reward -= 4 * self._current_item.position.z
+                reward -= self._current_item.position.z
 
             if RewardStrategy.PENALIZE_EACH_DISTANCE_NEXT_ITEM:
                 x_min = self._current_item.position.x
                 x_max = x_min + self._current_item.width
                 z = self._current_item.position.z
                 if self.use_height_map:
-                    left_items = np.where(self._matrix[:x_min] > z)
+                    left_items = np.where(self._matrix[:x_min] > z)[0]
                     if len(left_items) > 0:
                         distance_left = x_min - np.max(left_items) - 1
                     else:
@@ -273,7 +295,7 @@ class Packing2DWorldEnvV2(gym.Env):
                 else:
                     raise NotImplementedError()
 
-                reward += 10 * distance_left
+                reward -= 10 * distance_left if distance_left > 0 else -50
 
         # failed to pack current item
         else:
