@@ -33,7 +33,7 @@ def generate_expert_dataset():
         size=c.CONTAINER_SIZE,
         use_height_map=c.USE_HEIGHT_MAP,
         run_expert=True,
-        render_mode="human")
+        render_mode=None)
     env = FlattenObservation(env)
 
     expert_observations = np.empty(
@@ -44,7 +44,7 @@ def generate_expert_dataset():
 
         if len(actions) == 0:
             observation, _ = env.reset()
-            actions = env.expert_actions
+            actions = env.expert_positions
 
         action = actions[0]
         actions.remove(action)

@@ -2,13 +2,18 @@ import gymnasium
 import gym_packing
 
 import constants as c
+from packutils.data.article import Article
 
 from gymnasium.wrappers import FlattenObservation
 
 
 env = gymnasium.make(
     c.ENVIRONMENT,
-    articles=c.ARTICLES,
+    articles=[
+        Article("", 2, 1, 5, 1),
+        Article("", 3, 1, 5, 2),
+        Article("", 4, 1, 5, 1),
+    ],
     max_articles_per_order=None,
     reward_strategies=c.REWARD_STRATEGIES,
     size=c.CONTAINER_SIZE,

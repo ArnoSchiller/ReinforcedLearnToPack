@@ -13,6 +13,7 @@ from packutils.data.item import Item
 from packutils.data.order import Order
 from packutils.data.position import Position
 from packutils.data.article import Article
+from packutils.data.packing_variant import PackingVariant
 
 from packutils.solver.palletier_packer import PalletierPacker
 
@@ -44,6 +45,8 @@ class Packing2DWorldEnvV2(gym.Env):
         """
         self.articles = articles
         self.max_articles_per_order = max_articles_per_order
+        self._current_item = None
+        self._items_to_pack = []
 
         self.size = size
         self.window_size = 512
@@ -75,25 +78,29 @@ class Packing2DWorldEnvV2(gym.Env):
         self.window = None
         self.clock = None
 
-    def generate_order(self):
-        if self.max_articles_per_order is None:
-            order = Order(
-                order_id="test",
-                articles=self.articles)
-        else:
-            _articles = copy.deepcopy(self.articles)
-            for a in _articles:
-                a.amount = 0
-            for _ in range(self.max_articles_per_order):
-                _articles[random.randint(0, len(_articles)-1)].amount += 1
-            order = Order(
-                order_id="test",
-                articles=_articles)
+    def generate_order(self, order: 'Order | None' = None):
+        if order is None:
+            if self.max_articles_per_order is None:
+                order = Order(
+                    order_id="test",
+                    articles=self.articles)
+            else:
+                _articles = copy.deepcopy(self.articles)
+                for a in _articles:
+                    a.amount = 0
+                for _ in range(self.max_articles_per_order):
+                    _articles[random.randint(0, len(_articles)-1)].amount += 1
+                order = Order(
+                    order_id="test",
+                    articles=_articles)
 
         if self.run_expert:
             self.expert_actions = []
             solver = PalletierPacker(bins=[self._bin])
             result = solver.pack_variant(order)
+            if result is None:
+                self.generate_order()
+                return
 
             self._items = []
             for package in result.bins[0].packed_items:
@@ -122,7 +129,8 @@ class Packing2DWorldEnvV2(gym.Env):
         item_obs = np.array([
             self._current_item.width,
             self._current_item.height
-        ], dtype=int)
+        ], dtype=int) if self._current_item is not None else np.array([0, 0], dtype=int)
+
         return {"item": item_obs, "grid": self._matrix.flatten()}
 
     def _get_info(self):
@@ -136,6 +144,22 @@ class Packing2DWorldEnvV2(gym.Env):
             "packed": len(self._bin.packed_items),
             "remaining": len(self._items_to_pack)
         }
+
+    @property
+    def packed_variant(self) -> PackingVariant:
+        """
+        Get the packed bin as a packing variant.
+
+        Returns:
+            PackingVariant: Generated packing variant.
+        """
+        variant = PackingVariant()
+        variant.add_bin(self._bin)
+        variant.unpacked_items = []
+        for unpacked in self._items_to_pack:
+            variant.add_unpacked_item(unpacked, None)
+        print(variant.unpacked_items)
+        return variant  # height x width
 
     @property
     def _matrix(self):
@@ -171,6 +195,10 @@ class Packing2DWorldEnvV2(gym.Env):
         Returns:
             tuple: Initial observation and additional information.
         """
+        order = None
+        if options is not None:
+            order = options.get("order", None)
+
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
@@ -181,11 +209,15 @@ class Packing2DWorldEnvV2(gym.Env):
             height=self.size[1]
         )
 
-        self.generate_order()
+        if len(self.articles) > 0 or order is not None:
+            self.generate_order(order=order)
 
-        self._items_to_pack = [item for item in self._items]
-        self._current_item = self._items_to_pack[0]
-        self._current_item.position = None
+            self._items_to_pack = [item for item in self._items]
+            if len(self._items_to_pack) > 0:
+                self._current_item = self._items_to_pack[0]
+                self._current_item.position = None
+            else:
+                self._current_item = None
 
         self.failed_counter = 0
         self.prev_max_z = 0
@@ -209,12 +241,15 @@ class Packing2DWorldEnvV2(gym.Env):
         Returns:
             tuple: Next observation, reward, termination flag, additional information, and debug info.
         """
+        if self._current_item is None:
+            return self._get_obs(), 0, True, False, {"error": "no current item"}
+
         done = False
         reward = 0
 
         self.prev_max_z = np.max(
             self._matrix, axis=0 if self.use_height_map else 1)
-        self.prev_compactness = self._calculate_compactness()
+        self.prev_compactness = self.calculate_compactness()
 
         new_x = action
         if self.use_height_map:
@@ -223,7 +258,7 @@ class Packing2DWorldEnvV2(gym.Env):
             rows, _ = np.where(
                 self._matrix[:, new_x: new_x + self._current_item.width])
             z = max(rows) + 1 if len(rows) > 0 else 0
-        self._current_item.position = Position(x=new_x, y=0, z=z)
+        self._current_item.position = Position(x=int(new_x), y=0, z=int(z))
 
         is_packed, msg = self._bin.pack_item(self._current_item)
 
@@ -269,7 +304,7 @@ class Packing2DWorldEnvV2(gym.Env):
                 reward += 100 - (new_max_z - self.prev_max_z) * 10
 
             if RewardStrategy.REWARD_EACH_COMPACTNESS in self.reward_strategies:
-                compactness = self._calculate_compactness()
+                compactness = self.calculate_compactness()
                 reward += 100 - (compactness - self.prev_compactness) * 10
 
             if RewardStrategy.PENALIZE_EACH_DISTANCE_COG in self.reward_strategies:
@@ -305,7 +340,7 @@ class Packing2DWorldEnvV2(gym.Env):
         # last item packed successfully
         if done and is_packed:
             if RewardStrategy.REWARD_ALL_COMPACTNESS in self.reward_strategies:
-                compactness = self._calculate_compactness()
+                compactness = self.calculate_compactness()
                 reward += compactness * 100
 
             if RewardStrategy.REWARD_ALL_PACKED in self.reward_strategies:
@@ -398,7 +433,7 @@ class Packing2DWorldEnvV2(gym.Env):
             pygame.display.quit()
             pygame.quit()
 
-    def _calculate_compactness(self):
+    def calculate_compactness(self):
         if self.use_height_map:
             min_z = np.min(self._matrix, axis=0)
             max_z = np.max(self._matrix, axis=0)
