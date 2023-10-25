@@ -1,5 +1,3 @@
 gymnasium==0.28.1
 pygame==2.5.0
--e git+https://github.com/ArnoSchiller/PackingUtils.git#egg=packutils
 stable-baselines3[extra]
--e git+https://github.com/ArnoSchiller/palletier.git#egg=palletier
