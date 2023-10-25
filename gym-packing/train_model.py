@@ -43,6 +43,7 @@ env = DummyVecEnv([
         c.ENVIRONMENT,
         articles=c.ARTICLES,
         max_articles_per_order=c.MAX_ARTICLES,
+        max_next_items=c.MAX_NEXT_ITEMS,
         reward_strategies=c.REWARD_STRATEGIES,
         size=c.CONTAINER_SIZE,
         use_height_map=c.USE_HEIGHT_MAP
@@ -58,6 +59,7 @@ eval_env = DummyVecEnv([
         c.ENVIRONMENT,
         articles=c.ARTICLES,
         max_articles_per_order=None,
+        max_next_items=c.MAX_NEXT_ITEMS,
         reward_strategies=c.REWARD_STRATEGIES,
         size=c.CONTAINER_SIZE,
         use_height_map=c.USE_HEIGHT_MAP

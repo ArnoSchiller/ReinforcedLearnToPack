@@ -9,15 +9,13 @@ from gymnasium import spaces
 import pygame
 import numpy as np
 
-from packutils.data.bin import Bin
-from packutils.data.item import Item
-from packutils.data.order import Order
-from packutils.data.position import Position
-from packutils.data.article import Article
-from packutils.data.packing_variant import PackingVariant
-from packutils.visual.packing_visualization import PackingVisualization
-
-from packutils.solver.palletier_packer import PalletierPacker
+from gym_packing.data.bin import Bin
+from gym_packing.data.item import Item
+from gym_packing.data.order import Order
+from gym_packing.data.position import Position
+from gym_packing.data.article import Article
+from gym_packing.data.packing_variant import PackingVariant
+from gym_packing.visual.packing_visualization import PackingVisualization
 
 from gym_packing.envs.reward_strategies import RewardStrategy
 

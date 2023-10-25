@@ -1,6 +1,7 @@
 import copy
 import logging
 import math
+import os
 import random
 from typing import List
 import gymnasium as gym
@@ -12,12 +13,14 @@ from gym_packing.data.bin import Bin
 from gym_packing.data.item import Item
 from gym_packing.data.order import Order
 from gym_packing.data.position import Position
+from gym_packing.data.article import Article
 from gym_packing.data.packing_variant import PackingVariant
+from gym_packing.visual.packing_visualization import PackingVisualization
 
 from gym_packing.envs.reward_strategies import RewardStrategy
 
 
-class Packing2DWorldEnvV2(gym.Env):
+class Packing2DWorldEnvV4(gym.Env):
     """
     Gym environment for 2D packing problems.
     """
@@ -27,10 +30,13 @@ class Packing2DWorldEnvV2(gym.Env):
             self,
             articles,
             max_articles_per_order,
+            max_next_items,
             reward_strategies: List[RewardStrategy],
+            max_snappoints: int = 20,
             size=(40, 20),
             use_height_map=True,
             run_expert=False,
+            expert_image_dir=None,
             render_mode=None,
     ):
         """
@@ -49,6 +55,13 @@ class Packing2DWorldEnvV2(gym.Env):
         self.window_size = 512
         self.use_height_map = use_height_map
         self.run_expert = run_expert
+        self.expert_idx = 0
+        self.expert_image_dir = expert_image_dir
+        self.max_next_items = max_next_items
+        self.max_snappoints = max_snappoints
+
+        if self.run_expert and self.expert_image_dir is not None and os.path.exists(self.expert_image_dir):
+            os.makedirs(self.expert_image_dir, exist_ok=True)
 
         if len(reward_strategies) < 1:
             raise ValueError("You must provide at least one reward strategy.")
@@ -58,15 +71,22 @@ class Packing2DWorldEnvV2(gym.Env):
         grid_size = (self.size[0],) if self.use_height_map else self.size
         grid_max = self.size[1] + 1 if self.use_height_map else 1
         # print(grid_size)
-        self.observation_space = spaces.Dict({
+
+        obs_dict = {
+            "snappoints": spaces.Box(low=0, high=max(size), shape=(2*self.max_snappoints,), dtype=int),
             # dimension and position of the item in 2D space
-            "item": spaces.Box(low=0, high=max(size), shape=(2,), dtype=int),
-            # 1 for allocated, 0 for free
+            # "item": spaces.Box(low=0, high=max(size), shape=(2,), dtype=int),
+            # 1 for allocated, 0 for free or heightmap
             "grid": spaces.Box(low=0, high=grid_max, shape=grid_size, dtype=int),
-        })
+        }
+        if self.max_next_items > 0:
+            obs_dict["next_items"] = spaces.Box(
+                low=0, high=max(size), shape=(2*self.max_next_items,), dtype=int)
+
+        self.observation_space = spaces.Dict(obs_dict)
 
         # Define the action space (each possible x position)
-        self.action_space = spaces.Discrete(self.size[0])
+        self.action_space = spaces.Discrete(self.max_snappoints)
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
@@ -92,10 +112,21 @@ class Packing2DWorldEnvV2(gym.Env):
                     articles=_articles)
 
         if self.run_expert:
-            self.expert_actions = []
+            self.expert_idx += 1
+            self.expert_dimensions = []
+            self.expert_positions = []
             solver = PalletierPacker(bins=[self._bin])
             result = solver.pack_variant(order)
-            if result is None:
+
+            if self.expert_image_dir is not None:
+                try:
+                    vis = PackingVisualization()
+                    _ = vis.visualize_bin(
+                        bin=result.bins[0], show=False, output_dir=self.expert_image_dir)
+                except:
+                    pass
+
+            if result is None or len(result.bins) < 1:
                 self.generate_order()
                 return
 
@@ -103,7 +134,9 @@ class Packing2DWorldEnvV2(gym.Env):
             for package in result.bins[0].packed_items:
 
                 action = package.position.x
-                self.expert_actions.append(action)
+                self.expert_positions.append(action)
+                dimension = [package.width, package.height]
+                self.expert_dimensions.append(dimension)
 
                 package.position = None
                 self._items.append(package)
@@ -123,12 +156,24 @@ class Packing2DWorldEnvV2(gym.Env):
         Returns:
             dict: Dictionary containing the item location and the matrix representation of the grid.
         """
-        item_obs = np.array([
-            self._current_item.width,
-            self._current_item.height
-        ], dtype=int) if self._current_item is not None else np.array([0, 0], dtype=int)
 
-        return {"item": item_obs, "grid": self._matrix.flatten()}
+        snappoints = np.zeros((2*self.max_snappoints,))
+        for idx, snap in enumerate(self.snappoints):
+            if idx >= self.max_snappoints:
+                break
+            snappoints[2*idx] = snap.x
+            snappoints[2*idx+1] = snap.y
+
+        obs = {"snappoints": snappoints, "grid": self._matrix}
+
+        if self.max_next_items > 0:
+            unique_dimensions = list(set([(i.width, i.height)
+                                          for i in self._items_to_pack]))
+            self.next_items = np.zeros((self.max_next_items, 2), dtype=int)
+            for idx in range(min(len(unique_dimensions), self.max_next_items)):
+                self.next_items[idx, :] = unique_dimensions[idx]
+            obs["next_items"] = self.next_items.flatten()
+        return obs
 
     def _get_info(self):
         """
@@ -157,6 +202,36 @@ class Packing2DWorldEnvV2(gym.Env):
             variant.add_unpacked_item(unpacked, None)
         print(variant.unpacked_items)
         return variant  # height x width
+
+    def _get_snappoints(self):
+        if not self.use_height_map:
+            raise ValueError("Use heightmap instead")
+
+        change_points = [0]
+        heightmap = self._matrix
+        for idx in range(len(heightmap) - 1):
+            if heightmap[idx] != heightmap[idx+1]:
+                change_points.append(idx)
+        change_points.append(len(heightmap) - 1)
+
+        snappoints = []
+
+        w = self._current_item.width
+        for x in change_points:
+            # check if item can be placed left
+            x_min = x - w + 1
+            if x_min >= 0:
+                unique = np.unique(heightmap[x_min:x]).tolist()
+                if len(unique) == 1:
+                    snappoints.append(Position(x=x_min, y=0, z=int(unique[0])))
+
+            # check if item can be placed right
+            x_max = x + w
+            if x_max < self.size[0]:
+                unique = np.unique(heightmap[x:x_max]).tolist()
+                if len(unique) == 1:
+                    snappoints.append(Position(x=x, y=0, z=int(unique[0])))
+        return snappoints
 
     @property
     def _matrix(self):
@@ -210,11 +285,14 @@ class Packing2DWorldEnvV2(gym.Env):
             self.generate_order(order=order)
 
             self._items_to_pack = [item for item in self._items]
+            self._items_to_pack = sorted(
+                self._items_to_pack, key=lambda x: x.width, reverse=True)
             if len(self._items_to_pack) > 0:
                 self._current_item = self._items_to_pack[0]
                 self._current_item.position = None
             else:
                 self._current_item = None
+        self.snappoints = self._get_snappoints()
 
         self.failed_counter = 0
         self.prev_max_z = 0
@@ -238,8 +316,9 @@ class Packing2DWorldEnvV2(gym.Env):
         Returns:
             tuple: Next observation, reward, termination flag, additional information, and debug info.
         """
-        if self._current_item is None:
-            return self._get_obs(), 0, True, False, {"error": "no current item"}
+
+        if action >= len(self.snappoints):
+            return self._get_obs(), -50, False, False, self._get_info()
 
         done = False
         reward = 0
@@ -248,7 +327,8 @@ class Packing2DWorldEnvV2(gym.Env):
             self._matrix, axis=0 if self.use_height_map else 1)
         self.prev_compactness = self.calculate_compactness()
 
-        new_x = action
+        new_x = self.snappoints[action].x
+
         if self.use_height_map:
             z = max(self._matrix[new_x: new_x + self._current_item.width])
         else:
@@ -267,6 +347,7 @@ class Packing2DWorldEnvV2(gym.Env):
             self._items_to_pack.remove(self._current_item)
             if len(self._items_to_pack) < 1:
                 done = True
+
         else:
             self.failed_counter += 1
             if self.failed_counter > 10:
@@ -275,7 +356,14 @@ class Packing2DWorldEnvV2(gym.Env):
         reward = self.calculate_reward(is_packed, done)
 
         if not done and is_packed:
-            self._current_item = self._items_to_pack[0]
+            if self.max_next_items > 0:
+                self._current_item = None
+            else:
+                self._current_item = self._items_to_pack[0]
+                self.snappoints = self._get_snappoints()
+
+        if done and is_packed:
+            self._current_item = None
 
         observation = self._get_obs()
         info = self._get_info()

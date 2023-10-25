@@ -1,28 +1,24 @@
 
 
 from gym_packing.envs.reward_strategies import RewardStrategy
-from packutils.data.article import Article
+from gym_packing.data.article import Article
 
 
-ENVIRONMENT = "gym_packing/Packing2DWorld-v3"
+ENVIRONMENT = "gym_packing/Packing2DWorld-v4"
 CONTAINER_SIZE = (80, 80)
 USE_HEIGHT_MAP = True
-MAX_NEXT_ITEMS = 5
-EXPERT_INTERACTIONS = 10_000
+MAX_NEXT_ITEMS = 0
+EXPERT_INTERACTIONS = 0  # 10_000
 
 VERBOSE = 0
 MODEL_NAME = "PPO"
 POLICY = "MultiInputPolicy"
-N_STEPS = 2_000_000
+N_STEPS = 1_000_000
 PRETRAINED_MODEL_PATH = None  # "training/p2d_v2_PPO_9/best_model.zip"
 
 
 REWARD_STRATEGIES = [
-    RewardStrategy.REWARD_ALL_PACKED,
-    RewardStrategy.PENALIZE_EACH_DISTANCE_NEXT_ITEM,
-    RewardStrategy.PENALIZE_EACH_PACKED_HEIGHT,
-    RewardStrategy.PENALIZE_EACH_PACKING_FAILED,
-    RewardStrategy.PENALIZE_ALL_PACKING_FAILED,
+    RewardStrategy.REWARD_ALL_COMPACTNESS
 ]
 
 NUM_ENVS = 64
@@ -108,7 +104,7 @@ ARTICLES = [
         amount=5
     ),
     Article(
-        article_id="article 11",
+        article_id="article 12",
         width=5,
         length=1,
         height=5,

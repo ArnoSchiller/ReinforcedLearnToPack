@@ -17,3 +17,9 @@ register(
     entry_point="gym_packing.envs:Packing2DWorldEnvV3",
     max_episode_steps=300,
 )
+
+register(
+    "gym_packing/Packing2DWorld-v4",
+    entry_point="gym_packing.envs:Packing2DWorldEnvV4",
+    max_episode_steps=300,
+)

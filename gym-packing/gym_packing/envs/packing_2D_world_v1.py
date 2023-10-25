@@ -2,11 +2,12 @@ import gymnasium as gym
 from gymnasium import spaces
 import pygame
 import numpy as np
-from packutils.data.bin import Bin
-from packutils.data.item import Item
-from packutils.data.order import Order
-from packutils.data.article import Article
-from packutils.data.position import Position
+
+from gym_packing.data.bin import Bin
+from gym_packing.data.item import Item
+from gym_packing.data.order import Order
+from gym_packing.data.article import Article
+from gym_packing.data.position import Position
 
 
 class Packing2DWorldEnvV1(gym.Env):
